@@ -3,8 +3,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "biman82/springboot-demo"
-        IMAGE_TAG = "1.0.${BUILD_NUMBER}"
+        IMAGE_NAME = "bimansupakar/springboot-demo"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -17,21 +17,35 @@ pipeline {
 
         stage('Build Jar') {
             steps {
-                bat 'mvn clean package'
+                bat 'mvn clean package -DskipTests'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat "docker build -t %IMAGE_NAME%:%IMAGE_TAG% ."
+                bat 'docker build -t %IMAGE_NAME%:%IMAGE_TAG% .'
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+
+                    bat 'echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin'
+                }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                bat "docker push %IMAGE_NAME%:%IMAGE_TAG%"
+                bat 'docker push %IMAGE_NAME%:%IMAGE_TAG%'
             }
         }
+
     }
 
     post {
@@ -41,8 +55,7 @@ pipeline {
         }
 
         success {
-            echo 'Pipeline executed successfully.'
-            echo "Image Pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo 'Docker image pushed successfully.'
         }
 
         failure {
@@ -50,7 +63,9 @@ pipeline {
         }
 
         cleanup {
+            bat 'docker logout'
             echo 'Cleanup completed.'
         }
+
     }
 }
